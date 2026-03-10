@@ -13,10 +13,10 @@ const AsyncStorage = {
 };
 
 const getMenuForDate = (dateObj) => {
-    if (!dateObj) return "";
-    const dayIndex = dateObj.getDay(); 
-    const menuMap = { 1: "વેજ. પુલાવ-શાક", 2: "દાળ-ઢોકળી-શાક", 3: "દાળ-ભાત-શાક", 4: "દાળ-ઢોકળી-શાક", 5: "વેજ. મુઠીયા-શાક", 6: "વેજ. ખિચડી-દાળ", 0: "રવિવારની રજા" };
-    return menuMap[dayIndex] || "મેનુ નક્કી નથી";
+  if (!dateObj) return "";
+  const dayIndex = dateObj.getDay(); 
+  const menuMap = { 1: "વેજ. પુલાવ-શાક", 2: "દાળ-ઢોકળી-શાક", 3: "દાળ-ભાત-શાક", 4: "દાળ-ઢોકળી-શાક", 5: "વેજ. મુઠીયા-શાક", 6: "વેજ. ખિચડી-દાળ", 0: "રવિવારની રજા" };
+  return menuMap[dayIndex] || "મેનુ નક્કી નથી";
 };
 
 export default function DailyReport({ kendraNumber }) {
@@ -40,7 +40,6 @@ export default function DailyReport({ kendraNumber }) {
   const todaysMenu = getMenuForDate(date);
 
   const getDailyKey = (dateStr) => `@mdm_daily_data_${kendraNumber}_${dateStr}`;
-  // 🌟 માસ્ટર બેકઅપ કી (આ કી માં રજિસ્ટર્ડ ડેટા કાયમ સચવાશે)
   const getLastRegisterKey = () => `@mdm_master_register_${kendraNumber}`;
 
   useEffect(() => {
@@ -82,22 +81,17 @@ export default function DailyReport({ kendraNumber }) {
       const localKey = getDailyKey(dateStr); 
       const localDataStr = await AsyncStorage.getItem(localKey);
       
-      // 🌟 માસ્ટર બેકઅપ મેળવો
       const lastRegisterStr = await AsyncStorage.getItem(getLastRegisterKey()); 
       const lastRegisterData = lastRegisterStr ? JSON.parse(lastRegisterStr) : null;
 
-      // 🌟 ઓટો-ફિલ ફંક્શન (જો રજિસ્ટર્ડ સંખ્યા 0 હોય, તો જુનો બેકઅપ લગાવી દેશે)
       const applyBackup = (targetData) => {
           if (!lastRegisterData) return targetData;
           TABS.forEach(tab => {
-              const getRegTotal = (r) => (+r.sc||0) + (+r.st||0) + (+r.obc||0) + (+r.other||0);
-              
+              const getRegTotal = (r) => (+r?.sc||0) + (+r?.st||0) + (+r?.obc||0) + (+r?.other||0);
               if (lastRegisterData[tab]) {
-                  // જો વર્તમાન ફોર્મમાં રજિસ્ટર્ડ 0 હોય, તો બેકઅપમાંથી ભરી દો
                   if (getRegTotal(targetData[tab].register) === 0 && lastRegisterData[tab].register) {
                       targetData[tab].register = lastRegisterData[tab].register;
                   }
-                  // ધોરણ અને વર્ગો પણ ઓટો-ફિલ કરો
                   if ((!targetData[tab].stdCount || targetData[tab].stdCount === '0') && lastRegisterData[tab].stdCount) {
                       targetData[tab].stdCount = lastRegisterData[tab].stdCount;
                   }
@@ -118,8 +112,6 @@ export default function DailyReport({ kendraNumber }) {
             setIsGlobalHoliday(false);
             setGlobalHolidayReason('');
         }
-        
-        // 🌟 લોકલ ડેટા પર પણ બેકઅપ લાગુ કરો (કદાચ કોઈ ખાનું ભૂલથી રહી ગયું હોય તો)
         parsedData = applyBackup(parsedData);
         setDayData(parsedData);
       } 
@@ -138,8 +130,6 @@ export default function DailyReport({ kendraNumber }) {
                  setIsGlobalHoliday(true);
                  setGlobalHolidayReason(serverData['ધો. ૧ થી ૫'].holidayReason || '');
              }
-             
-             // 🌟 સર્વરના ડેટામાં પણ રજિસ્ટર્ડ બેકઅપ લાગુ કરો
              serverData = applyBackup(serverData);
              await AsyncStorage.setItem(localKey, JSON.stringify(serverData));
              setDayData(serverData);
@@ -148,10 +138,8 @@ export default function DailyReport({ kendraNumber }) {
         } catch (networkError) {}
 
         if (!isDataFetchedFromServer) {
-          // 🌟 નવી તારીખ માટે એકદમ ફ્રેશ ફોર્મ બનાવીને તેમાં માસ્ટર બેકઅપ ભરી દો
           let newDayState = {};
           TABS.forEach(tab => { newDayState[tab] = getDefaultsForTab(tab); });
-          
           newDayState = applyBackup(newDayState);
           setDayData(newDayState);
         }
@@ -178,9 +166,10 @@ export default function DailyReport({ kendraNumber }) {
       }
       newData[cat] = category;
 
-      if (cat !== 'અલ્પાહાર' && (type === 'register' || type === 'present')) {
+      if (cat !== 'અલ્પાહાર' && !isGlobalHoliday && (type === 'register' || type === 'present')) {
         const alp = { ...newData['અલ્પાહાર'] };
         const sumField = (fType, subF) => ['બાલવાટીકા', 'ધો. ૧ થી ૫', 'ધો. ૬ થી ૮'].reduce((sum, t) => sum + (+newData[t][fType][subF] || 0), 0).toString();
+        
         ['sc', 'st', 'obc', 'other', 'boys'].forEach(f => {
           alp.register[f] = sumField('register', f);
           alp.present[f] = sumField('present', f);
@@ -200,10 +189,23 @@ export default function DailyReport({ kendraNumber }) {
     setLoading(true);
 
     let finalDataToSave = JSON.parse(JSON.stringify(dayData));
-    TABS.forEach(tab => {
-        finalDataToSave[tab].menu = isGlobalHoliday ? 'રજા' : todaysMenu;
-        finalDataToSave[tab].holidayReason = isGlobalHoliday ? globalHolidayReason : '';
-    });
+    
+    // 🔥 જો રજા હોય તો ફોર્મ સબમિટ કરતી વખતે બધો ડેટા 0 કરી દો 
+    if (isGlobalHoliday) {
+      TABS.forEach(tab => {
+        finalDataToSave[tab].menu = 'રજા';
+        finalDataToSave[tab].holidayReason = globalHolidayReason;
+        // નોટ: આપણે રજિસ્ટર્ડ સંખ્યા (Register) 0 નથી કરતા, જેથી બેકઅપ સચવાઈ રહે. 
+        // ખાલી હાજર અને જમ્યાની સંખ્યા 0 કરીએ છીએ.
+        finalDataToSave[tab].present = { sc: '0', st: '0', obc: '0', other: '0', boys: '0', girls: '0' };
+        finalDataToSave[tab].meals = { sc: '0', st: '0', obc: '0', other: '0', boys: '0', girls: '0' };
+      });
+    } else {
+      TABS.forEach(tab => {
+        finalDataToSave[tab].menu = todaysMenu;
+        finalDataToSave[tab].holidayReason = '';
+      });
+    }
 
     const payload = {
       action: 'saveDaily',
@@ -218,7 +220,7 @@ export default function DailyReport({ kendraNumber }) {
     if (success) {
       await AsyncStorage.setItem(getDailyKey(dateStr), JSON.stringify(finalDataToSave));
       
-      // 🌟 ડેટા સેવ થાય ત્યારે રજિસ્ટર્ડ, ધોરણ અને વર્ગોની સંખ્યાનો માસ્ટર બેકઅપ લઈ લો
+      // 🌟 માસ્ટર બેકઅપ
       const registerBackup = {};
       TABS.forEach(t => { 
           registerBackup[t] = { 
@@ -246,7 +248,7 @@ export default function DailyReport({ kendraNumber }) {
         r.sc, r.st, r.obc, r.other, rT, r.boys, r.girls,
         p.sc, p.st, p.obc, p.other, pT, p.boys, p.girls,
         m.sc, m.st, m.obc, m.other, mT, m.boys, m.girls,
-        d.menu === 'રજા' ? d.holidayReason : (d.menu || '-')
+        isGlobalHoliday ? globalHolidayReason : (d.menu || '-')
       ];
   };
 
@@ -311,7 +313,7 @@ export default function DailyReport({ kendraNumber }) {
             )}
           </div>
 
-          <button className="save-btn" onClick={handleFastSave} disabled={loading}>
+          <button className="save-btn" onClick={handleFastSave} disabled={loading || (isGlobalHoliday && !globalHolidayReason)}>
             {loading ? <div className="spinner"></div> : <MdCloudUpload size={22} />}
             {loading ? "સેવ..." : "ડેટા સેવ કરો"}
           </button>
