@@ -166,6 +166,7 @@ export default function DailyReport({ kendraNumber }) {
       }
       newData[cat] = category;
 
+      // અલ્પાહાર ઓટો-સમ (જો રજા ન હોય તો જ ગણતરી કરો)
       if (cat !== 'અલ્પાહાર' && !isGlobalHoliday && (type === 'register' || type === 'present')) {
         const alp = { ...newData['અલ્પાહાર'] };
         const sumField = (fType, subF) => ['બાલવાટીકા', 'ધો. ૧ થી ૫', 'ધો. ૬ થી ૮'].reduce((sum, t) => sum + (+newData[t][fType][subF] || 0), 0).toString();
@@ -190,19 +191,21 @@ export default function DailyReport({ kendraNumber }) {
 
     let finalDataToSave = JSON.parse(JSON.stringify(dayData));
     
-    // 🔥 જો રજા હોય તો ફોર્મ સબમિટ કરતી વખતે બધો ડેટા 0 કરી દો 
+    // 🔥 સેવ કરતી વખતે ડેટાને ફોર્મેટ કરો
     if (isGlobalHoliday) {
       TABS.forEach(tab => {
         finalDataToSave[tab].menu = 'રજા';
         finalDataToSave[tab].holidayReason = globalHolidayReason;
-        // નોટ: આપણે રજિસ્ટર્ડ સંખ્યા (Register) 0 નથી કરતા, જેથી બેકઅપ સચવાઈ રહે. 
-        // ખાલી હાજર અને જમ્યાની સંખ્યા 0 કરીએ છીએ.
+        // રજિસ્ટર્ડ સંખ્યા બેકઅપ માટે એમનામ રાખીએ છીએ, ફક્ત હાજર અને જમ્યા 0 કરીએ છીએ
         finalDataToSave[tab].present = { sc: '0', st: '0', obc: '0', other: '0', boys: '0', girls: '0' };
         finalDataToSave[tab].meals = { sc: '0', st: '0', obc: '0', other: '0', boys: '0', girls: '0' };
       });
     } else {
       TABS.forEach(tab => {
-        finalDataToSave[tab].menu = todaysMenu;
+        // જો રજા ન હોય તો આજનું મેનુ સેટ કરો
+        if (finalDataToSave[tab].menu === 'રજા' || !finalDataToSave[tab].menu) {
+             finalDataToSave[tab].menu = todaysMenu;
+        }
         finalDataToSave[tab].holidayReason = '';
       });
     }
@@ -220,7 +223,7 @@ export default function DailyReport({ kendraNumber }) {
     if (success) {
       await AsyncStorage.setItem(getDailyKey(dateStr), JSON.stringify(finalDataToSave));
       
-      // 🌟 માસ્ટર બેકઅપ
+      // 🌟 માસ્ટર બેકઅપ અપડેટ કરો
       const registerBackup = {};
       TABS.forEach(t => { 
           registerBackup[t] = { 
@@ -313,7 +316,7 @@ export default function DailyReport({ kendraNumber }) {
             )}
           </div>
 
-          <button className="save-btn" onClick={handleFastSave} disabled={loading || (isGlobalHoliday && !globalHolidayReason)}>
+          <button className="save-btn" onClick={handleFastSave} disabled={loading || (isGlobalHoliday && !globalHolidayReason.trim())}>
             {loading ? <div className="spinner"></div> : <MdCloudUpload size={22} />}
             {loading ? "સેવ..." : "ડેટા સેવ કરો"}
           </button>
